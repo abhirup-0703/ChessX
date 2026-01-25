@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@/features/home/data/homePageData';
+import { Card } from '@/src/features/home/data/homePageData';
 
 interface FeatureCardProps {
   card: Card;

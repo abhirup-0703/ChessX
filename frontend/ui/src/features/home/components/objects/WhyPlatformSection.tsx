@@ -1,4 +1,4 @@
-import { Feature } from '@/features/home/data/homePageData';
+import { Feature } from '@/src/features/home/data/homePageData';
 
 interface WhyPlatformSectionProps {
   features: Feature[];
