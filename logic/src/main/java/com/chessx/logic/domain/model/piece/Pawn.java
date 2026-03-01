@@ -5,7 +5,9 @@ import com.chessx.logic.domain.model.Color;
 import com.chessx.logic.domain.model.Piece;
 import com.chessx.logic.domain.model.PieceType;
 import com.chessx.logic.domain.model.Square;
+import com.chessx.logic.domain.move.EnPassantMove;
 import com.chessx.logic.domain.move.Move;
+import com.chessx.logic.domain.move.PromotionMove;
 import com.chessx.logic.domain.move.StandardMove;
 
 import java.util.ArrayList;
@@ -23,18 +25,23 @@ public class Pawn extends Piece {
         int file = currentSquare.getFile();
         int rank = currentSquare.getRank();
         
-        // White moves up (+1 rank), Black moves down (-1 rank)
         int direction = (this.color == Color.WHITE) ? 1 : -1;
         int startRank = (this.color == Color.WHITE) ? 1 : 6;
+        int promotionRank = (this.color == Color.WHITE) ? 7 : 0;
 
-        // 1. Move forward one square
         int forwardOneRank = rank + direction;
-        if (Square.isValid(file, forwardOneRank)) {
+        
+        // 1. Forward Moves
+        if (Square.isValid(file, forwardOneRank) && board.isEmpty(new Square(file, forwardOneRank))) {
             Square forwardOneSquare = new Square(file, forwardOneRank);
-            if (board.isEmpty(forwardOneSquare)) {
+            
+            if (forwardOneRank == promotionRank) {
+                // Auto-promote to Queen for now
+                moves.add(new PromotionMove(currentSquare, forwardOneSquare, this, new Queen(this.color)));
+            } else {
                 moves.add(new StandardMove(currentSquare, forwardOneSquare, this));
-
-                // 2. Move forward two squares (only if on starting rank and path is clear)
+                
+                // Double move
                 if (rank == startRank) {
                     int forwardTwoRank = rank + (direction * 2);
                     Square forwardTwoSquare = new Square(file, forwardTwoRank);
@@ -45,14 +52,25 @@ public class Pawn extends Piece {
             }
         }
 
-        // 3. Diagonal Captures
+        // 2. Captures
         int[] captureFiles = {file - 1, file + 1};
         for (int targetFile : captureFiles) {
             if (Square.isValid(targetFile, forwardOneRank)) {
                 Square targetSquare = new Square(targetFile, forwardOneRank);
+                
                 // Standard capture
                 if (board.hasEnemyPiece(targetSquare, this.color)) {
-                    moves.add(new StandardMove(currentSquare, targetSquare, this));
+                    if (forwardOneRank == promotionRank) {
+                        moves.add(new PromotionMove(currentSquare, targetSquare, this, new Queen(this.color)));
+                    } else {
+                        moves.add(new StandardMove(currentSquare, targetSquare, this));
+                    }
+                }
+                
+                // En Passant capture
+                Square epTarget = board.getEnPassantTarget();
+                if (epTarget != null && epTarget.equals(targetSquare)) {
+                    moves.add(new EnPassantMove(currentSquare, targetSquare, this));
                 }
             }
         }
@@ -61,7 +79,5 @@ public class Pawn extends Piece {
     }
 
     @Override
-    public Piece copy() {
-        return new Pawn(this.color);
-    }
+    public Piece copy() { return new Pawn(this.color); }
 }

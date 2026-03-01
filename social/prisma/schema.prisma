@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- ENUMS ---
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+// --- CORE MODULE ---
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  chatRooms    ChatRoomMember[]
+  teams        TeamMember[]
+  teamPosts    TeamPost[]
+  teamComments TeamPostComment[]
+  forumThreads ForumThread[]
+  forumReplies ForumReply[]
+}
+
+// --- CHAT MODULE ---
+model ChatRoom {
+  id          String   @id @default(uuid())
+  name        String?  // Nullable for Direct Messages
+  isGroup     Boolean  @default(false)
+  teamId      String?  @unique // If this room belongs to a team
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  members     ChatRoomMember[]
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model ChatRoomMember {
+  roomId   String
+  userId   String
+  role     Role     @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  room     ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId]) // Composite primary key ensures a user is only in a room once
+}
+
+// --- TEAM MODULE ---
+model Team {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  members     TeamMember[]
+  posts       TeamPost[]
+  chatRoom    ChatRoom?    // A team automatically gets one linked chatroom
+}
+
+model TeamMember {
+  teamId   String
+  userId   String
+  role     Role     @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+}
+
+model TeamPost {
+  id        String   @id @default(uuid())
+  teamId    String
+  authorId  String
+  imageUrl  String?  // Cloudinary URL
+  caption   String?
+  createdAt DateTime @default(now())
+
+  team      Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  author    User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments  TeamPostComment[]
+}
+
+model TeamPostComment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  post      TeamPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+// --- FORUM MODULE ---
+model ForumCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+
+  threads     ForumThread[]
+}
+
+model ForumThread {
+  id          String   @id @default(uuid())
+  categoryId  String
+  authorId    String
+  title       String
+  content     String
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  category    ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  author      User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  replies     ForumReply[]
+}
+
+model ForumReply {
+  id        String   @id @default(uuid())
+  threadId  String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author    User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
