@@ -14,12 +14,14 @@ enum Role {
 
 // --- CORE MODULE ---
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique
-  email        String   @unique
-  passwordHash String
-  avatarUrl    String?
-  createdAt    DateTime @default(now())
+  id              String   @id @default(uuid())
+  username        String   @unique
+  email           String   @unique
+  passwordHash    String
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  invitesSent     ChatInvite[] @relation("InvitesSent")
+  invitesReceived ChatInvite[] @relation("InvitesReceived")
 
   // Relations
   chatRooms    ChatRoomMember[]
@@ -38,10 +40,29 @@ model ChatRoom {
   teamId      String?  @unique // If this room belongs to a team
   avatarUrl   String?
   createdAt   DateTime @default(now())
+  invites     ChatInvite[]
 
   // Relations
   members     ChatRoomMember[]
   team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model ChatInvite {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  
+  inviterId String
+  inviter   User     @relation("InvitesSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  
+  inviteeId String
+  invitee   User     @relation("InvitesReceived", fields: [inviteeId], references: [id], onDelete: Cascade)
+  
+  status    String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  createdAt DateTime @default(now())
+
+  // A user can only have one pending invite per room at a time
+  @@unique([roomId, inviteeId]) 
 }
 
 model ChatRoomMember {

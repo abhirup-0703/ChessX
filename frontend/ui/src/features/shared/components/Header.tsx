@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Settings, User, LogOut } from 'lucide-react';
+import { useAuth } from '@/features/auth/context/AuthContext'; // <-- Real Auth Context
 
 // Data for navigation items
 const navItems = [
@@ -40,6 +41,9 @@ const navItems = [
     dropdown: [
       { name: 'Leaderboard', href: '/leaderboard', icon: '📊' },
       { name: 'Forums', href: '/forums', icon: '🗣️' },
+      { name: 'Teams', href: '/teams', icon: '🛡️' }, // Changed to a shield just for variety!
+      { name: 'Chat', href: '/chat', icon: '💬' },
+      { name: 'Invites', href: '/invite', icon: '✉️' },
     ],
   },
 ];
@@ -49,8 +53,8 @@ const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   
-  // TEMPORARY: Local state to simulate auth until you implement JWT
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // REAL AUTH STATE
+  const { user, isLoading, handleLogout } = useAuth();
 
   const lastScrollY = useRef(0);
 
@@ -80,10 +84,6 @@ const Header = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Handlers for dummy auth
-  const handleLogin = () => setIsLoggedIn(true);
-  const handleLogout = () => setIsLoggedIn(false);
 
   return (
     <header
@@ -150,22 +150,27 @@ const Header = () => {
 
           {/* --- Right section (User Actions) --- */}
           <div className="hidden md:flex items-center space-x-4">
-            {!isLoggedIn ? (
+            {isLoading ? (
+              // Loading Skeleton
+              <div className="h-9 w-9 animate-pulse bg-slate-700 rounded-full"></div>
+            ) : !user ? (
+              // Logged Out State
               <>
-                <button 
-                  onClick={handleLogin}
+                <Link 
+                  href="/login"
                   className="px-4 py-2 text-gray-200 hover:text-white transition-all duration-300 hover:bg-white/10 rounded-lg font-medium"
                 >
                   Sign In
-                </button>
-                <button 
-                  onClick={handleLogin}
+                </Link>
+                <Link 
+                  href="/login"
                   className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-500 hover:to-green-500 transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-900/20"
                 >
                   Sign Up
-                </button>
+                </Link>
               </>
             ) : (
+              // Logged In State
               <div className="flex items-center gap-4">
                 <Link
                   href="/settings"
@@ -175,20 +180,31 @@ const Header = () => {
                   <Settings size={20} />
                 </Link>
                 
-                {/* Dummy User Avatar / Dropdown Trigger */}
+                {/* User Avatar / Dropdown Trigger */}
                 <div className="relative group cursor-pointer">
-                    <div className="h-9 w-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold border-2 border-purple-400/30">
-                        A
-                    </div>
-                    {/* Simple Logout Dropdown for demo */}
-                    <div className="absolute right-0 top-full mt-2 w-32 bg-slate-800 rounded-md shadow-xl py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto border border-purple-500/10">
-                        <button 
-                            onClick={handleLogout}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-red-400 hover:bg-white/5 flex items-center gap-2"
-                        >
-                            <LogOut size={14} />
-                            Sign Out
-                        </button>
+                    {user.avatarUrl ? (
+                      <img 
+                        src={user.avatarUrl} 
+                        alt={user.username} 
+                        className="h-9 w-9 rounded-full object-cover border-2 border-purple-400/30"
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold border-2 border-purple-400/30">
+                        {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                    )}
+
+                    {/* Logout Dropdown (Fixed Hover Bridge & Delay) */}
+                    <div className="absolute right-0 top-full pt-2 w-32 opacity-0 group-hover:opacity-100 transition-all duration-300 invisible group-hover:visible z-50">
+                        <div className="bg-slate-800 rounded-md shadow-xl py-1 border border-purple-500/10">
+                            <button 
+                                onClick={handleLogout}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-red-400 hover:bg-white/5 flex items-center gap-2 transition-colors"
+                            >
+                                <LogOut size={14} />
+                                Sign Out
+                            </button>
+                        </div>
                     </div>
                 </div>
               </div>
@@ -254,34 +270,56 @@ const Header = () => {
               </div>
             ))}
           </nav>
+          
           <div className="mt-6 pt-4 border-t border-purple-500/20 flex flex-col space-y-3">
-            {!isLoggedIn ? (
+            {isLoading ? (
+               <div className="h-10 w-full animate-pulse bg-slate-700 rounded-lg"></div>
+            ) : !user ? (
               <>
-                <button 
-                  onClick={handleLogin}
+                <Link 
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full text-center px-4 py-2 text-gray-200 hover:text-white transition-all duration-300 bg-white/5 hover:bg-white/10 rounded-lg"
                 >
                   Sign In
-                </button>
-                <button 
-                  onClick={handleLogin}
+                </Link>
+                <Link 
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full text-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-500 hover:to-green-500 transition-all duration-300"
                 >
                   Sign Up
-                </button>
+                </Link>
               </>
             ) : (
               <div className="flex justify-center items-center gap-5">
                 <Link
                   href="/settings"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
                 >
                   <Settings size={22} />
                 </Link>
-                <div className="h-9 w-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">
-                    A
-                </div>
-                <button onClick={handleLogout} className="text-gray-400 hover:text-red-400">
+                
+                {user.avatarUrl ? (
+                  <img 
+                    src={user.avatarUrl} 
+                    alt={user.username} 
+                    className="h-9 w-9 rounded-full object-cover border-2 border-purple-400/30"
+                  />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold border-2 border-purple-400/30">
+                    {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }} 
+                  className="text-gray-400 hover:text-red-400 p-2"
+                >
                     <LogOut size={22} />
                 </button>
               </div>

@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IMessage extends Document {
   roomId: string;        // References the PostgreSQL ChatRoom ID
   senderId: string;      // References the PostgreSQL User ID
+  username: { type: String, required: true }
   text?: string;         // Optional because a message might just be an image
   imageUrl?: string;     // Cloudinary URL for media
   readBy: string[];      // Array of User IDs who have seen it
