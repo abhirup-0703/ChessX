@@ -19,6 +19,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // New state for profanity filter check
   const [showSettings, setShowSettings] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -67,16 +68,48 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
     };
   }, [roomId, socket]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !socket || !user) return;
+    const textToSend = newMessage.trim();
+    if (!textToSend || !socket || !user) return;
 
-    socket.emit('send_message', {
-      roomId,
-      text: newMessage.trim(),
-    });
+    setIsAnalyzing(true);
+    try {
+      // 1. Call the Django Microservice
+      const response = await fetch('http://localhost:8000/api/analyze/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: textToSend }),
+      });
 
-    setNewMessage('');
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        console.error("Django Server Error:", errorDetails);
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // 2. Check if the message is toxic
+      if (data.is_toxic) {
+        alert("Your message doesn't clear our profanity standard and cannot be sent.");
+        // Note: Not clearing newMessage so the user can edit their message
+      } else {
+        // 3. If safe, send via socket
+        socket.emit('send_message', {
+          roomId,
+          text: textToSend,
+        });
+        setNewMessage('');
+      }
+    } catch (error) {
+      console.error('Profanity check error:', error);
+      alert('Could not verify message safety. Please check your connection to the filter service.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,7 +247,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
 
           <button 
             type="button" 
-            disabled={isUploading}
+            disabled={isUploading || isAnalyzing}
             onClick={() => fileInputRef.current?.click()}
             className="p-2 text-gray-400 hover:text-purple-400 transition-colors flex-shrink-0 disabled:opacity-50"
             title="Upload Image"
@@ -231,18 +264,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                 handleSendMessage(e);
               }
             }}
-            placeholder={isUploading ? "Uploading image..." : "Type a message..."}
-            disabled={isUploading}
+            placeholder={isUploading ? "Uploading image..." : isAnalyzing ? "Analyzing message..." : "Type a message..."}
+            disabled={isUploading || isAnalyzing}
             className="flex-1 bg-transparent border-none text-gray-200 text-sm focus:ring-0 resize-none max-h-32 min-h-[40px] py-2 px-1 custom-scrollbar disabled:opacity-50"
             rows={1}
           />
           
           <button 
             type="submit"
-            disabled={!newMessage.trim() || !isConnected || isUploading}
+            disabled={!newMessage.trim() || !isConnected || isUploading || isAnalyzing}
             className="p-2 mb-0.5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-gray-500 text-white rounded-lg transition-all shadow-md flex-shrink-0"
           >
-            <Send size={18} className={newMessage.trim() && isConnected ? 'translate-x-0.5 -translate-y-0.5' : ''} />
+            {isAnalyzing ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <Send size={18} className={newMessage.trim() && isConnected ? 'translate-x-0.5 -translate-y-0.5' : ''} />
+            )}
           </button>
         </form>
       </div>
