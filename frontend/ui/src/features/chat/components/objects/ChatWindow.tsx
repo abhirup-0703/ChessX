@@ -19,11 +19,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // New state for profanity filter check
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,11 +72,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const textToSend = newMessage.trim();
-    if (!textToSend || !socket || !user) return;
+    
+    // Guard clause to prevent empty messages or spamming Enter
+    if (!textToSend || !socket || !user || isAnalyzing || isUploading) return;
 
+    // 1. Optimistically clear the input so the user can immediately keep typing
+    setNewMessage('');
     setIsAnalyzing(true);
+    
     try {
-      // 1. Call the Django Microservice
       const response = await fetch('http://localhost:8000/api/analyze/', {
         method: 'POST',
         headers: {
@@ -92,23 +97,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
 
       const data = await response.json();
 
-      // 2. Check if the message is toxic
       if (data.is_toxic) {
         alert("Your message doesn't clear our profanity standard and cannot be sent.");
-        // Note: Not clearing newMessage so the user can edit their message
+        // Restore the message back to the input so they can edit it
+        // If they already started typing something new, we prepend the rejected text
+        setNewMessage((prev) => prev ? `${textToSend}\n${prev}` : textToSend);
       } else {
-        // 3. If safe, send via socket
         socket.emit('send_message', {
           roomId,
           text: textToSend,
         });
-        setNewMessage('');
       }
     } catch (error) {
       console.error('Profanity check error:', error);
       alert('Could not verify message safety. Please check your connection to the filter service.');
+      // Restore the message on connection error
+      setNewMessage((prev) => prev ? `${textToSend}\n${prev}` : textToSend);
     } finally {
       setIsAnalyzing(false);
+      // Ensure focus remains
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
     }
   };
 
@@ -120,7 +130,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
     try {
       const imageUrl = await chatApi.uploadImage(file);
       
-      // Emit the message with the imageUrl returned from Cloudinary
       socket.emit('send_message', {
         roomId,
         imageUrl: imageUrl,
@@ -130,7 +139,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
       alert('Failed to upload image. Please check your connection.');
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
     }
   };
 
@@ -201,7 +214,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                     </p>
                   )}
 
-                  {/* Image Rendering */}
                   {msg.imageUrl && (
                     <div className="mb-2 mt-1">
                       <img 
@@ -236,7 +248,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
           onSubmit={handleSendMessage}
           className="flex items-end gap-2 bg-slate-800 border border-slate-700 rounded-xl p-2 focus-within:border-purple-500/50 transition-colors shadow-inner"
         >
-          {/* Hidden File Input */}
           <input 
             type="file" 
             ref={fileInputRef}
@@ -247,7 +258,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
 
           <button 
             type="button" 
-            disabled={isUploading || isAnalyzing}
+            disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
             className="p-2 text-gray-400 hover:text-purple-400 transition-colors flex-shrink-0 disabled:opacity-50"
             title="Upload Image"
@@ -256,22 +267,29 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
           </button>
           
           <textarea
+            ref={textareaRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                handleSendMessage(e);
+                // 2. Only fire if we are not actively uploading or analyzing
+                if (!isUploading && !isAnalyzing && newMessage.trim()) {
+                  handleSendMessage(e);
+                }
               }
             }}
-            placeholder={isUploading ? "Uploading image..." : isAnalyzing ? "Analyzing message..." : "Type a message..."}
-            disabled={isUploading || isAnalyzing}
+            placeholder={isUploading ? "Uploading image..." : "Type a message..."}
+            // 3. Removed `isAnalyzing` from disabled so the user can keep typing!
+            disabled={isUploading} 
             className="flex-1 bg-transparent border-none text-gray-200 text-sm focus:ring-0 resize-none max-h-32 min-h-[40px] py-2 px-1 custom-scrollbar disabled:opacity-50"
             rows={1}
+            autoFocus 
           />
           
           <button 
             type="submit"
+            // The button still disables so they can't spam-click it
             disabled={!newMessage.trim() || !isConnected || isUploading || isAnalyzing}
             className="p-2 mb-0.5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-gray-500 text-white rounded-lg transition-all shadow-md flex-shrink-0"
           >

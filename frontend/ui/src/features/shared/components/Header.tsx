@@ -1,8 +1,11 @@
+// src/features/shared/components/Header.tsx
 'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Settings, User, LogOut } from 'lucide-react';
-import { useAuth } from '@/features/auth/context/AuthContext'; // <-- Real Auth Context
+import { User, LogOut } from 'lucide-react';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { SettingsDropdown } from './SettingsDropdown';
 
 // Data for navigation items
 const navItems = [
@@ -41,7 +44,7 @@ const navItems = [
     dropdown: [
       { name: 'Leaderboard', href: '/leaderboard', icon: '📊' },
       { name: 'Forums', href: '/forums', icon: '🗣️' },
-      { name: 'Teams', href: '/teams', icon: '🛡️' }, // Changed to a shield just for variety!
+      { name: 'Teams', href: '/teams', icon: '🛡️' }, 
       { name: 'Chat', href: '/chat', icon: '💬' },
       { name: 'Invites', href: '/invite', icon: '✉️' },
     ],
@@ -172,13 +175,9 @@ const Header = () => {
             ) : (
               // Logged In State
               <div className="flex items-center gap-4">
-                <Link
-                  href="/settings"
-                  className="text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
-                  aria-label="Settings"
-                >
-                  <Settings size={20} />
-                </Link>
+                
+                {/* 1. New Settings / Notifications Dropdown */}
+                <SettingsDropdown iconSize={20} />
                 
                 {/* User Avatar / Dropdown Trigger */}
                 <div className="relative group cursor-pointer">
@@ -293,13 +292,9 @@ const Header = () => {
               </>
             ) : (
               <div className="flex justify-center items-center gap-5">
-                <Link
-                  href="/settings"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
-                >
-                  <Settings size={22} />
-                </Link>
+                
+                {/* 2. New Settings / Notifications Dropdown (Mobile) */}
+                <SettingsDropdown iconSize={22} />
                 
                 {user.avatarUrl ? (
                   <img 

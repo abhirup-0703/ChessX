@@ -22,7 +22,7 @@ io.on('connection', (socket) => {
 // Start the server only after verifying both Mongo AND Cloudinary
 Promise.all([
   connectMongo(),
-  verifyCloudinary() // <-- Add the verification step here
+  verifyCloudinary()
 ]).then(() => {
   httpServer.listen(PORT, () => {
     console.log(`🚀 Social Engine running on http://localhost:${PORT}`);
